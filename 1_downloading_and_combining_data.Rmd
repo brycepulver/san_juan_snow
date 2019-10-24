@@ -10,7 +10,7 @@ library(rvest)
 library(tidyverse)
 library(lubridate)
 library(readxl)
-
+library(rvest)
 ```
 
 
@@ -149,6 +149,12 @@ the `SASP forcing` and `SBSP_forcing` meteoroligical datasets.
 
 ```{r}
 
+links1 <- webpage %>%
+  html_nodes('a') %>%
+  .[grepl('forcing',.)]%>%
+  html_attr('href')
+  
+head(links1)
 ```
 
 ## Download the meteorological data
@@ -158,6 +164,17 @@ commands to download the data ands save it in your data folder.
 You can use a for loop or a map function. 
 
 ```{r}
+#Grab only the name of the file by splitting out on forward slashes
+splits1 <- str_split_fixed(links1,'/',5)
+
+#Keep only the 8th column
+dataset1 <- splits1[,5] 
+
+#generate a file list for where the data goes
+file_names1 <- paste0('data/',dataset1)
+
+#Map version of the same forloop (downloading 2 files)
+map2(links1,file_names1,download.file)
 
 ```
 
@@ -167,6 +184,21 @@ Write a custom function to read in the data and append a site
 column to the data. 
 
 ```{r}
+library(pdftools)
+headers <- pdf_text('https://snowstudies.org/data/Serially-Complete-Metadata-text08.pdf') %>%
+  readr::read_lines(.) %>%
+  trimws(.) %>%
+  str_split_fixed(.,'\\.',2)%>%
+  .[,2]%>%
+  .[1:26]
+  
+snow_reader_txt <- function(file){
+  name = str_split_fixed(file,'/',2)[,2] %>%
+    gsub('.txt','',.)
+  df <- read_delim(file, delim = " ", col_names = headers) %>%
+    mutate(file = name)
+}
+
 
 ```
 
@@ -174,6 +206,8 @@ column to the data.
 Use the `map` function to read in both meteorological files.
 
 ```{r}
+
+snow_full <- map_dfr(file_names1,snow_reader_txt)
 
 ```
 
